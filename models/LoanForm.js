@@ -50,7 +50,16 @@ const loanFormSchema = new mongoose.Schema({
 	},
 
 	// Bank Details
-	bankDetails: { type: String, required: true },
+	bankDetails: {
+		type: Object,
+		required: true,
+		properties: {
+			bankName: { type: String, required: true },
+			bankAcNo: { type: Number, required: true },
+			bankBranch: { type: String, required: true },
+		},
+	},
+
 	loanAmount: {
 		type: Number,
 		min: [0, "Loan amount cannot be negative"],
