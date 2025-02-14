@@ -31,6 +31,7 @@ mongoose
 		console.error("Connection error:", err);
 	});
 
+// POST endpoint to save loan forms
 app.post("/api/loan-forms", async (req, res) => {
 	try {
 		const data = req.body;
@@ -39,7 +40,7 @@ app.post("/api/loan-forms", async (req, res) => {
 
 		await newLoanForm.save();
 
-		console.log("Data saved successfully:", newLoanForm);
+		console.log("New loan form submitted");
 		res.status(200).json({
 			message: "Data saved successfully",
 			data: newLoanForm,
@@ -53,10 +54,44 @@ app.post("/api/loan-forms", async (req, res) => {
 	}
 });
 
+// GET endpoint with pagination
 app.get("/api/loan-forms", async (req, res) => {
 	try {
-		const data = await LoanForm.find();
-		res.status(200).json(data);
+		const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
+		const limit = parseInt(req.query.limit) || 10; // Default to 10 items per page
+
+		const startIndex = (page - 1) * limit;
+		const endIndex = page * limit;
+
+		const totalDocuments = await LoanForm.countDocuments(); // Total number of documents
+
+		const data = await LoanForm.find()
+			.sort({ _id: -1 })
+			.skip(startIndex)
+			.limit(limit);
+
+		// Pagination result
+		const pagination = {};
+
+		if (endIndex < totalDocuments) {
+			pagination.next = {
+				page: page + 1,
+				limit: limit,
+			};
+		}
+
+		if (startIndex > 0) {
+			pagination.previous = {
+				page: page - 1,
+				limit: limit,
+			};
+		}
+
+		res.status(200).json({
+			data,
+			pagination,
+			totalDocuments,
+		});
 	} catch (err) {
 		console.error("Error retrieving data:", err);
 		res.status(500).json({

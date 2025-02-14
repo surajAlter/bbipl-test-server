@@ -13,8 +13,8 @@ const loanFormSchema = new mongoose.Schema({
 	telephone: { type: String },
 
 	// Address Information
-	// address: { type: Address.schema, required: true }, // Current Address
-	address: { type: String, required: true }, // Current Address
+	currentAddress: { type: Address.schema, required: true }, // Current Address
+	// address: { type: String, required: true }, // Current Address
 	yearsPresent: { type: Number, required: true },
 	yearsCity: { type: Number, required: true },
 
@@ -24,8 +24,8 @@ const loanFormSchema = new mongoose.Schema({
 		type: Number,
 		min: [0, "Rental amount cannot be negative"], // Non-negative constraint
 	},
-	// permanentAddress: { type: Address.schema }, // Permanent Address
-	permanentAddress: { type: String }, // Permanent Address
+	permanentAddress: { type: Address.schema }, // Permanent Address
+	// permanentAddress: { type: String }, // Permanent Address
 
 	// Marital Status
 	maritalStatus: { type: String, enum: ["Y", "N"], required: true },
@@ -36,8 +36,8 @@ const loanFormSchema = new mongoose.Schema({
 	// Employment Details
 	officeName: { type: String },
 	officePhone: { type: String },
-	// officeAddress: { type: Address.schema }, // Office Address
-	officeAddress: { type: String }, // Office Address
+	officeAddress: { type: Address.schema }, // Office Address
+	// officeAddress: { type: String }, // Office Address
 	yearsEmployed: {
 		type: Number,
 		min: [0, "Years employed cannot be negative"],
@@ -60,12 +60,12 @@ const loanFormSchema = new mongoose.Schema({
 	// References
 	relativeName: { type: String, required: true },
 	relativeMobile: { type: String, required: true },
-	// relativeAddress: { type: Address.schema, required: true }, // Relative's Address
-	relativeAddress: { type: String, required: true }, // Relative's Address
+	relativeAddress: { type: Address.schema, required: true }, // Relative's Address
+	// relativeAddress: { type: String, required: true }, // Relative's Address
 	friendName: { type: String, required: true },
 	friendMobile: { type: String, required: true },
-	// friendAddress: { type: Address.schema, required: true }, // Friend's Address
-	friendAddress: { type: String, required: true }, // Friend's Address
+	friendAddress: { type: Address.schema, required: true }, // Friend's Address
+	// friendAddress: { type: String, required: true }, // Friend's Address
 
 	// Timestamps
 	createdAt: { type: Date, default: Date.now },
