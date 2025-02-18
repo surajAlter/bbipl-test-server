@@ -1,10 +1,38 @@
 const mongoose = require("mongoose");
 const Address = require("./Address");
+const Time = require("./Time");
+
+const curTime = () => {
+	const date = new Date();
+	const days = [
+		"Sunday",
+		"Monday",
+		"Tuesday",
+		"Wednesday",
+		"Thursday",
+		"Friday",
+		"Saturday",
+	];
+
+	let hour = date.getHours();
+	const meridian = hour >= 12 ? "PM" : "AM";
+	hour = hour % 12 || 12;
+
+	return {
+		date: date.getDate(),
+		day: days[date.getDay()],
+		month: date.getMonth() + 1,
+		year: date.getFullYear(),
+		hour: hour,
+		minute: date.getMinutes(),
+		meridian: meridian,
+	};
+};
 
 const loanFormSchema = new mongoose.Schema({
 	// Personal Details
 	customerName: { type: String, required: true },
-	dateOfBirth: { type: Date, required: true },
+	dateOfBirth: { type: Time.schema, required: true },
 	fatherName: { type: String, required: true },
 	motherName: { type: String, required: true },
 
@@ -31,7 +59,7 @@ const loanFormSchema = new mongoose.Schema({
 	maritalStatus: { type: String, enum: ["Y", "N"], required: true },
 	dependents: { type: String, enum: ["Y", "N"], required: true },
 	spouseName: { type: String },
-	spouseDob: { type: Date },
+	spouseDob: { type: Time.schema },
 
 	// Employment Details
 	officeName: { type: String },
@@ -77,8 +105,8 @@ const loanFormSchema = new mongoose.Schema({
 	// friendAddress: { type: String, required: true }, // Friend's Address
 
 	// Timestamps
-	createdAt: { type: Date, default: Date.now },
-	updatedAt: { type: Date, default: Date.now },
+	createdAt: { type: Time.schema, default: curTime() },
+	updatedAt: { type: Time.schema, default: curTime() },
 });
 
 const LoanForm = mongoose.model("LoanForm", loanFormSchema);

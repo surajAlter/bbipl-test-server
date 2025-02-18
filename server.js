@@ -31,10 +31,40 @@ mongoose
 		console.error("Connection error:", err);
 	});
 
+convTime = (d) => {
+	const date = new Date(d);
+	const days = [
+		"Sunday",
+		"Monday",
+		"Tuesday",
+		"Wednesday",
+		"Thursday",
+		"Friday",
+		"Saturday",
+	];
+
+	let hour = date.getHours();
+	const meridian = hour >= 12 ? "PM" : "AM";
+	hour = hour % 12 || 12;
+
+	return {
+		date: date.getDate(),
+		day: days[date.getDay()],
+		month: date.getMonth() + 1,
+		year: date.getFullYear(),
+		hour: hour,
+		minute: date.getMinutes(),
+		meridian: meridian,
+	};
+};
 // POST endpoint to save loan forms
 app.post("/api/loan-forms", async (req, res) => {
 	try {
 		const data = req.body;
+
+		//changing the date formats to Date object
+		data.dateOfBirth = convTime(data.dateOfBirth);
+		if (data.spouseDob) data.spouseDob = convTime(data.spouseDob);
 
 		const newLoanForm = new LoanForm(data);
 
