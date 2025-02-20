@@ -38,7 +38,7 @@ const loanFormSchema = new mongoose.Schema({
 
 	// Contact Details
 	mobile: { type: String, required: true },
-	telephone: { type: String },
+	altMobile: { type: String },
 
 	// Address Information
 	currentAddress: { type: Address.schema, required: true }, // Current Address
@@ -76,6 +76,11 @@ const loanFormSchema = new mongoose.Schema({
 		min: [0, "Total years employed cannot be negative"],
 		required: true,
 	},
+	salary: {
+		type: Number,
+		min: [0, "Salary cannot be negative"],
+		required: true,
+	},
 
 	// Bank Details
 	bankDetails: {
@@ -91,6 +96,12 @@ const loanFormSchema = new mongoose.Schema({
 	loanAmount: {
 		type: Number,
 		min: [0, "Loan amount cannot be negative"],
+		required: true,
+	},
+
+	prevEMI: {
+		type: Number,
+		min: [0, "Previous EMI cannot be negative"],
 		required: true,
 	},
 
