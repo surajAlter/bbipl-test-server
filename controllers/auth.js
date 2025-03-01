@@ -151,6 +151,12 @@ router.post("/login/official", async (req, res) => {
 		if (!isMatch)
 			return res.status(400).json({ message: "Invalid credentials" });
 
+		if (
+			official.role !== "admin" &&
+			(official.role !== req.body.role || official.dept !== req.body.dept)
+		)
+			return res.status(400).json({ message: "Unauthorized access!" });
+
 		const token = jwt.sign(
 			{ officialId: official.officialId, role: official.role },
 			process.env.JWT_SECRET,
