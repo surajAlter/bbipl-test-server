@@ -1,16 +1,40 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
+const Official = require("../models/Official");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const token_time_limit = "1h";
 const verify_token = require("../middlewares/verify_token");
 
-//Role codes
-const USER_CODE = 0;
-const ADMIN_CODE = 1;
+convTime = (d) => {
+	const date = new Date(d);
+	const days = [
+		"Sunday",
+		"Monday",
+		"Tuesday",
+		"Wednesday",
+		"Thursday",
+		"Friday",
+		"Saturday",
+	];
 
-// Signup route
+	let hour = date.getHours();
+	const meridian = hour >= 12 ? "PM" : "AM";
+	hour = hour % 12 || 12;
+
+	return {
+		date: date.getDate(),
+		day: days[date.getDay()],
+		month: date.getMonth() + 1,
+		year: date.getFullYear(),
+		hour: hour,
+		minute: date.getMinutes(),
+		meridian: meridian,
+	};
+};
+
+// Signup Route - User
 router.post("/signup/user", async (req, res) => {
 	try {
 		const {
@@ -44,33 +68,32 @@ router.post("/signup/user", async (req, res) => {
 			password: hashedPassword,
 			countryCode,
 			gender,
-			dob,
-			role: USER_CODE,
+			dob: convTime(dob),
 		});
 
 		await newUser.save();
 		res.status(201).json({ message: "User created successfully" });
 	} catch (e) {
-		console.log(e);
-		res.status(500).send(e.message);
+		// res.status(403).json({ message: e.message });
+		res.status(403).json({ message: "Server Error" });
 	}
 });
 
-// Login route - USER
+// Login Route - User
 router.post("/login/user", async (req, res) => {
 	// if (!email || !password) {
 	// 	return res.status(400).send("Please enter all fields");
 	// }
 
 	try {
-		const { userinput, password } = req.body;
+		const { password } = req.body;
 
 		let user;
 
-		if (userinput.includes("@")) {
-			user = await User.findOne({ email: userinput });
+		if (req.body.email) {
+			user = await User.findOne({ email: req.body.email });
 		} else {
-			user = await User.findOne({ mobile: userinput });
+			user = await User.findOne({ mobile: req.body.mobile });
 		}
 
 		if (!user) {
@@ -82,7 +105,7 @@ router.post("/login/user", async (req, res) => {
 		if (!isMatch)
 			return res.status(400).json({ message: "Invalid credentials" });
 
-		const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+		const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
 			expiresIn: token_time_limit,
 		});
 
@@ -97,34 +120,39 @@ router.post("/login/user", async (req, res) => {
 			user: { fname: user.firstName, email: user.email },
 		});
 	} catch (e) {
-		res.status(500).json({ message: e.message });
+		// res.status(500).json({ message: e.message });
+		res.status(500).json({ message: "Server Error" });
 	}
 });
 
-//Login route - Admin
-router.post("/login/admin", async (req, res) => {
+//Login route - Official
+router.post("/login/official", async (req, res) => {
 	try {
 		const password = req.body.password;
 
-		let user;
+		let official;
 
-		if (req.body.email) {
-			user = await User.findOne({ email: req.body.email });
+		if (req.body.officialId) {
+			official = await Official.findOne({
+				officialId: req.body.officialId,
+			});
+		} else if (req.body.email) {
+			official = await Official.findOne({ email: req.body.email });
 		} else {
-			user = await User.findOne({ mobile: req.body.mobile });
+			official = await Official.findOne({ mobile: req.body.mobile });
 		}
 
-		if (!user) {
+		if (!official) {
 			// console.log("Admin not found with info as ", req.body);
-			return res.status(400).json({ message: "Admin not found" });
+			return res.status(400).json({ message: "Official not found" });
 		}
 
-		const isMatch = await bcrypt.compare(password, user.password);
+		const isMatch = await bcrypt.compare(password, official.password);
 		if (!isMatch)
 			return res.status(400).json({ message: "Invalid credentials" });
 
 		const token = jwt.sign(
-			{ id: user._id, role: ADMIN_CODE },
+			{ officialId: official.officialId, role: official.role },
 			process.env.JWT_SECRET,
 			{
 				expiresIn: token_time_limit,
@@ -139,11 +167,15 @@ router.post("/login/admin", async (req, res) => {
 		// const { pswd, ...userWithoutPasswd } = user;
 		res.status(200).send({
 			token,
-			user: { fname: user.firstName, email: user.email, role: user.role },
+			official: {
+				fname: official.firstName,
+				email: official.email,
+				role: official.role,
+			},
 		});
 	} catch (e) {
-		console.log(e);
-		res.status(500).json({ message: e.message });
+		// res.status(500).json({ message: e.message });
+		res.status(500).json({ message: "Server Error" });
 	}
 });
 
@@ -166,25 +198,27 @@ router.post("/login/admin", async (req, res) => {
 
 router.get("/verify-role", verify_token, async (req, res) => {
 	try {
-		const user = await User.findById(req.id);
+		const official = await Official.findById(req.id);
 
-		if (!user) {
-			return res.status(404).json({ message: "User not found" });
+		if (!official) {
+			return res.status(404).json({ message: "Official not found" });
 		}
 
-		res.send({ role: user.role });
+		res.send({ role: official.role });
 	} catch (e) {
+		// res.status(403).json({ message: e.message });
 		res.status(403).json({ message: "Server Error" });
 	}
 });
 
-router.get("/all-users", verify_token, async (req, res) => {
-	if (!req.id || req.role !== ADMIN_CODE)
+router.get("/all-officials", verify_token, async (req, res) => {
+	if (req.role !== "admin")
 		return res.status(403).json({
 			message: "Unauthorized! Only Admins are allowed to view all users",
 		});
-	const users = await User.find();
-	res.status(200).send({ users });
+
+	const officials = await Official.find();
+	res.status(200).send({ officials });
 });
 
 module.exports = router;

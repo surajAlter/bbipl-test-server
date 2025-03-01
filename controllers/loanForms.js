@@ -3,9 +3,6 @@ const router = express.Router();
 const LoanForm = require("../models/LoanForm");
 const verify_token = require("../middlewares/verify_token");
 
-//role codes
-const ADMIN_CODE = 1;
-
 convTime = (d) => {
 	const date = new Date(d);
 	const days = [
@@ -62,7 +59,7 @@ router.post("/", async (req, res) => {
 // GET endpoint with pagination
 router.get("/", verify_token, async (req, res) => {
 	try {
-		if (req.role !== ADMIN_CODE) {
+		if (req.role !== "admin") {
 			return res.status(403).json({ message: "Unauthorized" });
 		}
 

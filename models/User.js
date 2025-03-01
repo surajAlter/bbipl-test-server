@@ -1,20 +1,15 @@
 const mongoose = require("mongoose");
+const Time = require("./Time");
 
 const UserSchema = new mongoose.Schema({
-	firstName: String,
+	firstName: { type: String, required: true },
 	lastName: String,
 	email: { type: String, unique: true, required: true },
-	mobile: String,
+	mobile: { type: String, unique: true, required: true },
 	password: { type: String, required: true },
 	countryCode: String,
-	gender: String,
-	dob: String,
-	role: {
-		type: Number,
-		min: 0,
-		max: 1,
-		required: true,
-	},
+	gender: { type: String, enum: ["male", "female", "other"], required: true },
+	dob: { type: Time.schema, required: true },
 });
 
 const User = mongoose.model("User", UserSchema);

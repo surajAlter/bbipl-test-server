@@ -20,8 +20,13 @@ module.exports = function (req, res, next) {
 
 			if (payload.role) {
 				req.role = payload.role;
+				req.officialId = payload.officialId;
+			} else if (req.userId) {
+				req.userId = payload.userId;
+			} else {
+				return res.status(403).send("Token is not valid");
 			}
-			req.id = payload.id;
+
 			next();
 		});
 	} catch (e) {
