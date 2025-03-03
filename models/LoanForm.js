@@ -118,6 +118,8 @@ const loanFormSchema = new mongoose.Schema({
 	// Timestamps
 	createdAt: { type: Time.schema, default: curTime() },
 	updatedAt: { type: Time.schema, default: curTime() },
+
+	userId: { type: mongoose.Schema.Types.ObjectId },
 });
 
 const LoanForm = mongoose.model("LoanForm", loanFormSchema);

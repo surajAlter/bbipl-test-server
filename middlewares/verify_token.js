@@ -21,7 +21,7 @@ module.exports = function (req, res, next) {
 			if (payload.role) {
 				req.role = payload.role;
 				req.officialId = payload.officialId;
-			} else if (req.userId) {
+			} else if (payload.userId) {
 				req.userId = payload.userId;
 			} else {
 				return res.status(403).send("Token is not valid");
@@ -30,6 +30,7 @@ module.exports = function (req, res, next) {
 			next();
 		});
 	} catch (e) {
-		res.status(403).json({ message: "Server Error" });
+		// res.status(500).json({ message: e.message });
+		res.status(500).json({ message: "Server Error" });
 	}
 };

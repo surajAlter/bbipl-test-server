@@ -30,13 +30,17 @@ convTime = (d) => {
 	};
 };
 // POST endpoint to save loan forms
-router.post("/", async (req, res) => {
+router.post("/", verify_token, async (req, res) => {
 	try {
+		if (req.role !== "admin" && !req.userId)
+			res.status(403).json({ message: "Unauthorized" });
+
 		const data = req.body;
 
 		//changing the date formats to Date object
 		data.dateOfBirth = convTime(data.dateOfBirth);
 		if (data.spouseDob) data.spouseDob = convTime(data.spouseDob);
+		data.userId = req.userId;
 
 		const newLoanForm = new LoanForm(data);
 
@@ -72,6 +76,56 @@ router.get("/", verify_token, async (req, res) => {
 		const totalDocuments = await LoanForm.countDocuments(); // Total number of documents
 
 		const data = await LoanForm.find()
+			.sort({ _id: -1 })
+			.skip(startIndex)
+			.limit(limit);
+
+		// Pagination result
+		const pagination = {};
+
+		if (endIndex < totalDocuments) {
+			pagination.next = {
+				page: page + 1,
+				limit: limit,
+			};
+		}
+
+		if (startIndex > 0) {
+			pagination.previous = {
+				page: page - 1,
+				limit: limit,
+			};
+		}
+
+		res.status(200).json({
+			data,
+			pagination,
+			totalDocuments,
+		});
+	} catch (err) {
+		console.error("Error retrieving data:", err);
+		res.status(500).json({
+			message: "Error retrieving data",
+			error: err.message,
+		});
+	}
+});
+
+router.get("/own", verify_token, async (req, res) => {
+	try {
+		if (req.role !== "admin" && !req.userId) {
+			return res.status(403).json({ message: "Unauthorized" });
+		}
+
+		const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
+		const limit = parseInt(req.query.limit) || 10; // Default to 10 items per page
+
+		const startIndex = (page - 1) * limit;
+		const endIndex = page * limit;
+
+		const totalDocuments = await LoanForm.countDocuments(); // Total number of documents
+
+		const data = await LoanForm.find({ userId: req.userId })
 			.sort({ _id: -1 })
 			.skip(startIndex)
 			.limit(limit);

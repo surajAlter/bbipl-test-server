@@ -227,4 +227,14 @@ router.get("/all-officials", verify_token, async (req, res) => {
 	res.status(200).send({ officials });
 });
 
+router.get("/info", verify_token, async (req, res) => {
+	if (req.role !== "admin" && !req.userId)
+		return res.status(403).json({
+			message: "Unauthorized! Only Admins are allowed to view all users",
+		});
+
+	const user = await User.findById(req.userId);
+	res.status(200).send({ user });
+});
+
 module.exports = router;
