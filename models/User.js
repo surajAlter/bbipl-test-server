@@ -10,6 +10,8 @@ const UserSchema = new mongoose.Schema({
 	countryCode: String,
 	gender: { type: String, enum: ["male", "female", "other"], required: true },
 	dob: { type: Time.schema, required: true },
+	lastSent: { type: Date, default: new Date() },
+	isVerified: { type: Boolean, default: false },
 });
 
 const User = mongoose.model("User", UserSchema);

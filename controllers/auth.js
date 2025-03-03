@@ -2,10 +2,14 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const Official = require("../models/Official");
+const UserVerification = require("../models/UserVerification");
+const Password = require("../models/Password");
+const { v4: uuidv4 } = require("uuid");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const token_time_limit = "1h";
 const verify_token = require("../middlewares/verify_token");
+const token_time_limit = "1h";
+const sendEmail = require("../middlewares/send_email");
 
 convTime = (d) => {
 	const date = new Date(d);
@@ -32,6 +36,51 @@ convTime = (d) => {
 		minute: date.getMinutes(),
 		meridian: meridian,
 	};
+};
+
+const sendVerificationEmail = ({ _id, email }, res) => {
+	const uniqueString = uuidv4() + _id;
+
+	const mailOptions = {
+		to: email,
+		subject: "Verify Your Email",
+		html: `<p>Verify your email address to complete the signup and login into your account.</p>
+		<p>This link <b>expires in 1 hour</b>.</p><p>Click <a href=${process.env.SERVER_URL}/api/auth/verify-email/${_id}/${uniqueString}>here</a> to proceed.</p>`,
+	};
+
+	bcrypt
+		.hash(uniqueString, 10)
+		.then((hashedUniqueString) => {
+			const newVerification = new UserVerification({
+				userId: _id,
+				uniqueString: hashedUniqueString,
+				createdAt: new Date(),
+				expiresAt: new Date(Date.now() + 3600000),
+			});
+
+			newVerification
+				.save()
+				.then(() => {
+					sendEmail(
+						mailOptions,
+						res,
+						"Verification email couldn't be sent",
+						"Verification Email Sent"
+					);
+				})
+				.catch((err) => {
+					console.log(err);
+					res.status(500).json({
+						message: "Couldn't save email verification data",
+					});
+				});
+		})
+		.catch((err) => {
+			console.log(err);
+			res.status(500).json({
+				message: "An error occurred while hashing email data",
+			});
+		});
 };
 
 // Signup Route - User
@@ -71,7 +120,13 @@ router.post("/signup/user", async (req, res) => {
 			dob: convTime(dob),
 		});
 
-		await newUser.save();
+		const result = await newUser.save();
+
+		// Delete existing password (if any)
+		await Password.deleteMany({ email });
+		await Password.create({ userId: result._id, email, password });
+
+		sendVerificationEmail(result, res);
 		res.status(201).json({ message: "User created successfully" });
 	} catch (e) {
 		// res.status(403).json({ message: e.message });
@@ -104,6 +159,13 @@ router.post("/login/user", async (req, res) => {
 		const isMatch = await bcrypt.compare(password, user.password);
 		if (!isMatch)
 			return res.status(400).json({ message: "Invalid credentials" });
+
+		if (!user.isVerified) {
+			return res.status(400).json({
+				message:
+					"Email Not Verified. Please check your email and verify your account to continue.",
+			});
+		}
 
 		const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
 			expiresIn: token_time_limit,
@@ -217,6 +279,104 @@ router.get("/verify-role", verify_token, async (req, res) => {
 	}
 });
 
+router.get("/verify-email/:userId/:uniqueString", async (req, res) => {
+	let { userId, uniqueString } = req.params;
+
+	UserVerification.find({ userId })
+		.then((result) => {
+			if (result.length > 0) {
+				const { expiresAt } = result[0];
+				const hashedUniqueString = result[0].uniqueString;
+
+				if (expiresAt < Date.now()) {
+					UserVerification.deleteOne({ userId })
+						.then(() => {
+							User.deleteOne({ _id: userId })
+								.then()
+								.catch((err) => console.log(err));
+						})
+						.catch((err) => console.log(err))
+						.finally(() =>
+							res.send(
+								"Verification link has expired. Please sign up again."
+							)
+						);
+				} else {
+					bcrypt
+						.compare(uniqueString, hashedUniqueString)
+						.then((result) => {
+							if (result) {
+								//Verification successful
+								User.updateOne(
+									{ _id: userId },
+									{ isVerified: true }
+								)
+									.then(() => {
+										UserVerification.deleteOne({ userId })
+											.then(() => {
+												return res.send(
+													"Verification Successful! You can now log in."
+												);
+											})
+											.catch((err) => {
+												console.log(err);
+												return res.send(
+													"Verification failed. Please sign up again."
+												);
+											});
+									})
+									.catch((err) => {
+										console.log(err);
+										return res.send(
+											"Verification failed. Please sign up again."
+										);
+									});
+							} else {
+								console.log(err);
+								return res.send(
+									"Invalid verification link. Check your inbox again. If it still doesn't work, please sign up again."
+								);
+							}
+						})
+						.catch((err) => {
+							console.log(err);
+							return res.send(
+								"Invalid verification link. Please sign up again."
+							);
+						});
+
+					// UserVerification.deleteOne({ uniqueString })
+					// 	.then(() => {
+					// 		User.updateOne(
+					// 			{ userId },
+					// 			{ $set: { verified: true } }
+					// 		)
+					// 			.then(() => {
+					// 				return res.status(200).json({
+					// 					message:
+					// 						"Account verified successfully. You can now log in.",
+					// 				});
+					// 			})
+					// 			.catch((err) => {
+					// 				console.log(err);
+					// 			});
+					// 	})
+					// 	.catch((err) => {
+					// 		console.log(err);
+					// 	});
+				}
+			} else {
+				return res.status(400).json({
+					message:
+						"Account record doesn't exist or has been verified already. Please sign up or log in.",
+				});
+			}
+		})
+		.catch((err) => {
+			console.log(err);
+		});
+});
+
 router.get("/all-officials", verify_token, async (req, res) => {
 	if (req.role !== "admin")
 		return res.status(403).json({
@@ -235,6 +395,50 @@ router.get("/info", verify_token, async (req, res) => {
 
 	const user = await User.findById(req.userId);
 	res.status(200).send({ user });
+});
+
+router.post("/forgot-password/user", async (req, res) => {
+	try {
+		const user = await User.findOne({ email: req.body.email });
+		// console.log("Forgot password called for ", req);
+
+		if (!user) {
+			return res.status(404).json({ message: "User not found" });
+		} else if (!user.isVerified) {
+			return res.status(400).json({
+				message:
+					"Email Not Verified. Please check your email and verify your account to continue.",
+			});
+		}
+
+		const lastSent = new Date(user.lastSent);
+		if (lastSent.getTime() > Date.now() - 60000) {
+			return res.status(400).json({
+				message: "Please wait for 10 minutes before trying again",
+			});
+		}
+
+		const info = await Password.findOne({ email: user.email });
+
+		await sendEmail(
+			{
+				to: info.email,
+				subject: "Forgot Password? No problem!",
+				html: `<p>Your Credentials</p><p>Email: ${info.email}</p><p>Password: ${info.password}</p>`,
+			},
+			res,
+			"Password Reset Email couldn't be sent",
+			"Password Reset Email Sent"
+		);
+
+		user.lastSent = Date.now();
+		await user.save();
+
+		return res.status(200).json({ message: "Email sent successfully" });
+	} catch (error) {
+		console.log(error);
+		return res.status(500).json({ message: "Internal server error" });
+	}
 });
 
 module.exports = router;
