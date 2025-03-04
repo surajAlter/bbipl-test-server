@@ -38,14 +38,14 @@ convTime = (d) => {
 	};
 };
 
-const sendVerificationEmail = ({ _id, email }, res) => {
+const sendVerificationEmail = ({ _id, email }, res, isOfficial = false) => {
 	const uniqueString = uuidv4() + _id;
 
 	const mailOptions = {
 		to: email,
 		subject: "Verify Your Email",
 		html: `<p>Verify your email address to complete the signup and login into your account.</p>
-		<p>This link <b>expires in 1 hour</b>.</p><p>Click <a href=${process.env.SERVER_URL}/api/auth/verify-email/${_id}/${uniqueString}>here</a> to proceed.</p>`,
+		<p>This link <b>expires in 1 hour</b>.</p><p>Click <a href=${process.env.SERVER_URL}/api/auth/verify-email/${_id}/${uniqueString}?isOfficial=${isOfficial}>here</a> to proceed.</p>`,
 	};
 
 	bcrypt
@@ -102,7 +102,9 @@ router.post("/signup/user", async (req, res) => {
 		// 	return res.status(400).send("Please enter all fields");
 		// }
 
-		const existingUser = await User.findOne({ email });
+		const existingUser = await User.findOne({
+			$or: [{ email }, { mobile }],
+		});
 		if (existingUser)
 			return res.status(400).json({ message: "User already exists" });
 
@@ -127,10 +129,66 @@ router.post("/signup/user", async (req, res) => {
 		await Password.create({ userId: result._id, email, password });
 
 		sendVerificationEmail(result, res);
-		res.status(201).json({ message: "User created successfully" });
+		res.status(201).json({ message: "Verification Email Sent" });
 	} catch (e) {
 		// res.status(403).json({ message: e.message });
-		res.status(403).json({ message: "Server Error" });
+		// console.log(e);
+		res.status(500).json({ message: "Server Error" });
+	}
+});
+
+// Signup Route - Official
+router.post("/signup/official", verify_token, async (req, res) => {
+	if (req.role !== "admin")
+		return res.status(403).json({ message: "Unauthorized access!" });
+
+	try {
+		const {
+			firstName,
+			lastName,
+			email,
+			mobile,
+			password,
+			countryCode,
+			gender,
+			dob,
+			dept,
+			role,
+		} = req.body;
+
+		const existingOfficial = await Official.findOne({
+			$or: [{ email }, { mobile }],
+		});
+		if (existingOfficial)
+			return res.status(400).json({ message: "Official already exists" });
+
+		const hashedPassword = await bcrypt.hash(password, 10);
+		// console.log("Hi");
+
+		const newOfficial = new Official({
+			firstName,
+			lastName,
+			email,
+			mobile,
+			password: hashedPassword,
+			countryCode,
+			gender,
+			dob: convTime(dob),
+			dept,
+			role,
+		});
+
+		const result = await newOfficial.save();
+
+		// Delete existing password (if any)
+		await Password.deleteMany({ email });
+		await Password.create({ userId: result._id, email, password });
+
+		sendVerificationEmail(result, res, true);
+		res.status(201).json({ message: "Verification Email Sent" });
+	} catch (e) {
+		// res.status(403).json({ message: e.message });
+		res.status(500).json({ message: e.message });
 	}
 });
 
@@ -179,7 +237,7 @@ router.post("/login/user", async (req, res) => {
 		// const { pswd, ...userWithoutPasswd } = user;
 		res.status(200).send({
 			token,
-			user: { fname: user.firstName, email: user.email },
+			user: { firstName: user.firstName, email: user.email },
 		});
 	} catch (e) {
 		// res.status(500).json({ message: e.message });
@@ -219,6 +277,13 @@ router.post("/login/official", async (req, res) => {
 		)
 			return res.status(400).json({ message: "Unauthorized access!" });
 
+		if (!official.isVerified) {
+			return res.status(400).json({
+				message:
+					"Email Not Verified. Please check your email and verify your account to continue.",
+			});
+		}
+
 		const token = jwt.sign(
 			{ officialId: official.officialId, role: official.role },
 			process.env.JWT_SECRET,
@@ -236,7 +301,7 @@ router.post("/login/official", async (req, res) => {
 		res.status(200).send({
 			token,
 			official: {
-				fname: official.firstName,
+				firstName: official.firstName,
 				email: official.email,
 				role: official.role,
 			},
@@ -281,6 +346,11 @@ router.get("/verify-role", verify_token, async (req, res) => {
 
 router.get("/verify-email/:userId/:uniqueString", async (req, res) => {
 	let { userId, uniqueString } = req.params;
+	let isOfficial = req.query.isOfficial == "true";
+
+	// console.log(isOfficial, " verifying email of userId:", userId);
+
+	const model = isOfficial ? Official : User;
 
 	UserVerification.find({ userId })
 		.then((result) => {
@@ -291,7 +361,8 @@ router.get("/verify-email/:userId/:uniqueString", async (req, res) => {
 				if (expiresAt < Date.now()) {
 					UserVerification.deleteOne({ userId })
 						.then(() => {
-							User.deleteOne({ _id: userId })
+							model
+								.deleteOne({ _id: userId })
 								.then()
 								.catch((err) => console.log(err));
 						})
@@ -304,18 +375,23 @@ router.get("/verify-email/:userId/:uniqueString", async (req, res) => {
 				} else {
 					bcrypt
 						.compare(uniqueString, hashedUniqueString)
-						.then((result) => {
-							if (result) {
+						.then((isMatch) => {
+							if (isMatch) {
 								//Verification successful
-								User.updateOne(
-									{ _id: userId },
-									{ isVerified: true }
-								)
+								model
+									.updateOne(
+										{ _id: userId },
+										{ isVerified: true }
+									)
 									.then(() => {
 										UserVerification.deleteOne({ userId })
 											.then(() => {
 												return res.send(
-													"Verification Successful! You can now log in."
+													`${
+														isOfficial
+															? "Official"
+															: "User"
+													} Verification Successful! You can now log in.`
 												);
 											})
 											.catch((err) => {
@@ -337,12 +413,6 @@ router.get("/verify-email/:userId/:uniqueString", async (req, res) => {
 									"Invalid verification link. Check your inbox again. If it still doesn't work, please sign up again."
 								);
 							}
-						})
-						.catch((err) => {
-							console.log(err);
-							return res.send(
-								"Invalid verification link. Please sign up again."
-							);
 						});
 
 					// UserVerification.deleteOne({ uniqueString })
@@ -366,14 +436,14 @@ router.get("/verify-email/:userId/:uniqueString", async (req, res) => {
 					// 	});
 				}
 			} else {
-				return res.status(400).json({
-					message:
-						"Account record doesn't exist or has been verified already. Please sign up or log in.",
-				});
+				return res.send(
+					"Account record doesn't exist or has been verified already. Please sign up or log in."
+				);
 			}
 		})
 		.catch((err) => {
-			console.log(err);
+			// console.log(err);
+			res.send("Invalid verification link. Please sign up again.");
 		});
 });
 
@@ -403,7 +473,9 @@ router.post("/forgot-password/user", async (req, res) => {
 		// console.log("Forgot password called for ", req);
 
 		if (!user) {
-			return res.status(404).json({ message: "User not found" });
+			return res.status(404).json({
+				message: "User not found",
+			});
 		} else if (!user.isVerified) {
 			return res.status(400).json({
 				message:
@@ -434,7 +506,72 @@ router.post("/forgot-password/user", async (req, res) => {
 		user.lastSent = Date.now();
 		await user.save();
 
-		return res.status(200).json({ message: "Email sent successfully" });
+		return res
+			.status(200)
+			.json({ message: "Email with credentials sent successfully" });
+	} catch (error) {
+		console.log(error);
+		return res.status(500).json({ message: "Internal server error" });
+	}
+});
+
+router.post("/forgot-password/official", async (req, res) => {
+	try {
+		if (!req.body.email && !req.body.officialId)
+			return res
+				.status(400)
+				.json({ message: "Please provide email or officialId" });
+
+		const official = await Official.findOne({
+			$or: [
+				{ email: req.body.email },
+				{ officialId: req.body.officialId },
+			],
+		});
+		// console.log("Forgot password called for ", req);
+
+		if (
+			!official ||
+			(official.role !== "admin" &&
+				(official.dept !== req.body.dept ||
+					official.role !== req.body.role))
+		) {
+			return res.status(404).json({
+				message: "Official not found",
+			});
+		} else if (!official.isVerified) {
+			return res.status(400).json({
+				message:
+					"Email Not Verified. Please check your email and verify your account to continue.",
+			});
+		}
+
+		const lastSent = new Date(official.lastSent);
+		if (lastSent.getTime() > Date.now() - 60000) {
+			return res.status(400).json({
+				message: "Please wait for 10 minutes before trying again",
+			});
+		}
+
+		const info = await Password.findOne({ email: official.email });
+
+		await sendEmail(
+			{
+				to: info.email,
+				subject: "Forgot Password? No problem!",
+				html: `<p>Your Credentials</p><p>Email: ${info.email}</p><p>Password: ${info.password}</p>`,
+			},
+			res,
+			"Password Reset Email couldn't be sent",
+			"Password Reset Email Sent"
+		);
+
+		official.lastSent = Date.now();
+		await official.save();
+
+		return res
+			.status(200)
+			.json({ message: "Email with credentials sent successfully" });
 	} catch (error) {
 		console.log(error);
 		return res.status(500).json({ message: "Internal server error" });

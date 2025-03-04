@@ -13,22 +13,29 @@ const OfficialSchema = new mongoose.Schema({
 	officialId: {
 		type: String,
 		unique: true,
-		required: true,
 	},
 	firstName: { type: String, required: true },
 	lastName: String,
-	email: { type: String, unique: true, required: true },
 	countryCode: String,
 	mobile: { type: String, unique: true, required: true },
+	email: { type: String, unique: true, required: true },
 	password: { type: String, required: true },
 	gender: { type: String, enum: ["male", "female", "other"], required: true },
 	dob: { type: Time.schema, required: true },
 	dept: { type: String, enum: ["finance"], required: true },
 	role: {
 		type: String,
-		enum: ["admin", "teamLeader", "telecaller"],
+		enum: [
+			"admin",
+			"manager",
+			"backendSupport",
+			"teamLeader",
+			"telecaller",
+		],
 		required: true,
 	},
+	lastSent: { type: Date, default: new Date() },
+	isVerified: { type: Boolean, default: false },
 });
 
 // Pre-save hook to generate officialId

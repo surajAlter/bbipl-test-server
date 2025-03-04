@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const Time = require("./Time");
 
 const passwordSchema = new mongoose.Schema({
 	userId: {

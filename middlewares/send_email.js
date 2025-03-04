@@ -20,7 +20,7 @@ const sendEmail = async (
 				.status(err.code)
 				.json({ message: errMessage ? errMessage : err.message });
 		} else {
-			console.log("Email sent: " + info);
+			console.log("Email sent: " + info.response);
 			return res.status(200).json({ message: successMessage });
 		}
 	});
