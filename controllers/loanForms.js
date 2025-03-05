@@ -46,7 +46,7 @@ router.post("/", verify_token, async (req, res) => {
 
 		await newLoanForm.save();
 
-		console.log("New loan form submitted");
+		// console.log("New loan form submitted");
 		res.status(200).json({
 			message: "Data saved successfully",
 			data: newLoanForm,
@@ -97,7 +97,7 @@ router.get("/", verify_token, async (req, res) => {
 			};
 		}
 
-		res.status(200).json({
+		res.status(200).send({
 			data,
 			pagination,
 			totalDocuments,
@@ -106,7 +106,6 @@ router.get("/", verify_token, async (req, res) => {
 		console.error("Error retrieving data:", err);
 		res.status(500).json({
 			message: "Error retrieving data",
-			error: err.message,
 		});
 	}
 });
@@ -147,7 +146,7 @@ router.get("/own", verify_token, async (req, res) => {
 			};
 		}
 
-		res.status(200).json({
+		res.status(200).send({
 			data,
 			pagination,
 			totalDocuments,

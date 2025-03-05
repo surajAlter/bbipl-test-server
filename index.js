@@ -25,10 +25,12 @@ app.use(express.json());
 
 const authAuthController = require("./controllers/auth");
 const loanFormsController = require("./controllers/loanForms");
+const contactUs = require("./controllers/contactUs");
 
 // app.use("/api/user", userRoutes);
 app.use("/api/auth", authAuthController);
 app.use("/api/loan-forms", loanFormsController);
+app.use("/api/contact-us", contactUs);
 
 // Connect to MongoDB
 connectDB();

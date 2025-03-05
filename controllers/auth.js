@@ -458,13 +458,18 @@ router.get("/all-officials", verify_token, async (req, res) => {
 });
 
 router.get("/info", verify_token, async (req, res) => {
-	if (req.role !== "admin" && !req.userId)
-		return res.status(403).json({
-			message: "Unauthorized! Only Admins are allowed to view all users",
-		});
+	// if (req.role !== "admin" && !req.userId && !req.officialId)
+	// 	return res.status(403).json({
+	// 		message: "Unauthorized!",
+	// 	});
 
-	const user = await User.findById(req.userId);
-	res.status(200).send({ user });
+	if (req.role) {
+		const official = await Official.findOne({ officialId: req.officialId });
+		res.status(200).send({ official });
+	} else {
+		const user = await User.findById(req.userId);
+		res.status(200).send({ user });
+	}
 });
 
 router.post("/forgot-password/user", async (req, res) => {
