@@ -57,6 +57,10 @@ router.put("/", verify_token, async (req, res) => {
 			return res.status(404).send({
 				message: "Such contact request was not found",
 			});
+		} else if (data.status === "Complete") {
+			return res.status(400).send({
+				message: "Already replied to this request",
+			});
 		}
 
 		const mailOptions = {

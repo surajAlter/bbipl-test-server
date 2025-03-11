@@ -527,12 +527,13 @@ router.post("/forgot-password/official", async (req, res) => {
 				.status(400)
 				.json({ message: "Please provide email or officialId" });
 
-		const official = await Official.findOne({
-			$or: [
-				{ email: req.body.email },
-				{ officialId: req.body.officialId },
-			],
-		});
+		// const official = await Official.findOne({
+		// 	$or: [
+		// 		{ email: req.body.email },
+		// 		{ officialId: req.body.officialId },
+		// 	],
+		// });
+		const official = await Official.findOne({ email: req.body.email });
 		// console.log("Forgot password called for ", req);
 
 		if (
